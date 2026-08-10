@@ -56,6 +56,8 @@ export class CanvasViewImpl implements CanvasView, Listener {
     private text: SVGSVGElement;
     private adoptedText: SVG.Container;
     private background: HTMLCanvasElement;
+    private relatedImage: HTMLCanvasElement;
+    private relatedImageBitmap: ImageBitmap | null;
     private masksContent: HTMLCanvasElement;
     private bitmap: HTMLCanvasElement;
     private bitmapUpdateReqId: number;
@@ -778,7 +780,7 @@ export class CanvasViewImpl implements CanvasView, Listener {
     };
 
     private moveCanvas(): void {
-        for (const obj of [this.background, this.grid, this.bitmap]) {
+        for (const obj of [this.background, this.relatedImage, this.grid, this.bitmap]) {
             obj.style.top = `${this.geometry.top}px`;
             obj.style.left = `${this.geometry.left}px`;
         }
@@ -804,6 +806,7 @@ export class CanvasViewImpl implements CanvasView, Listener {
         // Transform canvas
         for (const obj of [
             this.background,
+            this.relatedImage,
             this.grid,
             this.content,
             this.bitmap,
@@ -893,7 +896,7 @@ export class CanvasViewImpl implements CanvasView, Listener {
     }
 
     private resizeCanvas(): void {
-        for (const obj of [this.background, this.masksContent, this.grid, this.bitmap]) {
+        for (const obj of [this.background, this.relatedImage, this.masksContent, this.grid, this.bitmap]) {
             obj.style.width = `${this.geometry.image.width}px`;
             obj.style.height = `${this.geometry.image.height}px`;
         }
@@ -901,6 +904,31 @@ export class CanvasViewImpl implements CanvasView, Listener {
         for (const obj of [this.content, this.text, this.attachmentBoard]) {
             obj.style.width = `${this.geometry.image.width + this.geometry.offset * 2}px`;
             obj.style.height = `${this.geometry.image.height + this.geometry.offset * 2}px`;
+        }
+    }
+
+    private renderRelatedImage(data: CanvasModel['relatedImage']): void {
+        if (!data) {
+            this.relatedImage.style.display = 'none';
+            this.relatedImageBitmap = null;
+            this.relatedImage.width = 0;
+            this.relatedImage.height = 0;
+            return;
+        }
+
+        this.relatedImage.style.display = '';
+        this.relatedImage.style.opacity = `${Math.min(Math.max(data.opacity, 0), 1)}`;
+        this.relatedImage.style.mixBlendMode = data.blendMode;
+
+        if (this.relatedImageBitmap !== data.imageData) {
+            this.relatedImageBitmap = data.imageData;
+            this.relatedImage.width = data.imageData.width;
+            this.relatedImage.height = data.imageData.height;
+            const context = this.relatedImage.getContext('2d');
+            if (context) {
+                context.clearRect(0, 0, data.imageData.width, data.imageData.height);
+                context.drawImage(data.imageData, 0, 0);
+            }
         }
     }
 
@@ -1965,6 +1993,8 @@ export class CanvasViewImpl implements CanvasView, Listener {
         this.text = window.document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         this.adoptedText = SVG.adopt((this.text as any) as HTMLElement) as SVG.Container;
         this.background = window.document.createElement('canvas');
+        this.relatedImage = window.document.createElement('canvas');
+        this.relatedImageBitmap = null;
         this.masksContent = window.document.createElement('canvas');
         this.bitmapUpdateReqId = 0;
         this.bitmap = window.document.createElement('canvas');
@@ -2028,6 +2058,8 @@ export class CanvasViewImpl implements CanvasView, Listener {
         // Setup content
         this.text.setAttribute('id', 'cvat_canvas_text_content');
         this.background.setAttribute('id', 'cvat_canvas_background');
+        this.relatedImage.setAttribute('id', 'cvat_canvas_related_image');
+        this.relatedImage.style.display = 'none';
         this.masksContent.setAttribute('id', 'cvat_canvas_masks_content');
         this.content.setAttribute('id', 'cvat_canvas_content');
         this.bitmap.setAttribute('id', 'cvat_canvas_bitmap');
@@ -2048,6 +2080,7 @@ export class CanvasViewImpl implements CanvasView, Listener {
 
         this.canvas.appendChild(this.text);
         this.canvas.appendChild(this.background);
+        this.canvas.appendChild(this.relatedImage);
         this.canvas.appendChild(this.masksContent);
         this.canvas.appendChild(this.bitmap);
         this.canvas.appendChild(this.grid);
@@ -2270,8 +2303,10 @@ export class CanvasViewImpl implements CanvasView, Listener {
 
             if (configuration.smoothImage === true) {
                 this.background.classList.remove('cvat_canvas_pixelized');
+                this.relatedImage.classList.remove('cvat_canvas_pixelized');
             } else if (configuration.smoothImage === false) {
                 this.background.classList.add('cvat_canvas_pixelized');
+                this.relatedImage.classList.add('cvat_canvas_pixelized');
             }
 
             this.configuration = configuration;
@@ -2360,9 +2395,13 @@ export class CanvasViewImpl implements CanvasView, Listener {
                 this.moveCanvas();
                 this.resizeCanvas();
                 this.transformCanvas();
+                this.renderRelatedImage(this.controller.relatedImage);
             } else {
                 this.isImageLoading = true;
+                this.renderRelatedImage(null);
             }
+        } else if (reason === UpdateReasons.RELATED_IMAGE_CHANGED) {
+            this.renderRelatedImage(this.controller.relatedImage);
         } else if (reason === UpdateReasons.FITTED_CANVAS) {
             // Canvas geometry is going to be changed. Old object positions aren't valid any more
             this.setupObjects([]);

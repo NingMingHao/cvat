@@ -8,6 +8,27 @@
     margin-bottom: $grid-unit-size * 3;
 }
 
+.cvat-image-setups-related-image-overlay,
+.cvat-image-setups-related-image-blend-mode {
+    min-width: $grid-unit-size * 64;
+
+    .ant-select {
+        width: 100%;
+    }
+}
+
+.cvat-image-setups-related-image-overlay {
+    margin-bottom: $grid-unit-size;
+
+    .cvat-related-image-overlay-opacity {
+        margin: 4px 6px;
+    }
+}
+
+.cvat-image-setups-related-image-blend-mode {
+    margin-bottom: $grid-unit-size * 3;
+}
+
 .cvat-canvas-hints-container {
     filter: none;
     position: absolute;

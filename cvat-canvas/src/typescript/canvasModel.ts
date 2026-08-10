@@ -33,6 +33,13 @@ export interface RenderData {
     visibleSkeletonElements: Record<number, number[]>;
 }
 
+export interface RelatedImageData {
+    frameNumber: number;
+    imageData: ImageBitmap;
+    opacity: number;
+    blendMode: string;
+}
+
 export interface Geometry {
     image: Size;
     canvas: Size;
@@ -228,6 +235,7 @@ export enum UpdateReasons {
     DRAG_CANVAS = 'drag_canvas',
     ZOOM_CANVAS = 'zoom_canvas',
     CONFIG_UPDATED = 'config_updated',
+    RELATED_IMAGE_CHANGED = 'related_image_changed',
     DATA_FAILED = 'data_failed',
     DESTROY = 'destroy',
 }
@@ -256,6 +264,7 @@ export interface CanvasModel {
     readonly issueRegions: Record<number, { hidden: boolean; points: number[] }>;
     readonly objects: any[];
     readonly renderData: RenderData;
+    readonly relatedImage: RelatedImageData | null;
     readonly gridSize: Size;
     readonly focusData: FocusData;
     readonly activeElement: ActiveElement;
@@ -278,6 +287,7 @@ export interface CanvasModel {
     move(topOffset: number, leftOffset: number): void;
 
     setup(frameData: any, objectStates: any[], renderData?: RenderData): void;
+    setRelatedImage(data: RelatedImageData | null): void;
     setupIssueRegions(issueRegions: Record<number, { hidden: boolean; points: number[] }>): void;
     activate(clientID: number | null, attributeID: number | null): void;
     highlight(clientIDs: number[], severity: HighlightSeverity): void;
@@ -368,6 +378,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
         imageBitmap: boolean;
         image: Image | null;
         imageID: number | null;
+        loadedImageID: number | null;
         imageOffset: number;
         imageSize: Size;
         imageIsDeleted: boolean;
@@ -375,6 +386,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
         gridSize: Size;
         objects: any[];
         renderData: RenderData;
+        relatedImage: RelatedImageData | null;
         issueRegions: Record<number, { hidden: boolean; points: number[] }>;
         scale: number;
         top: number;
@@ -439,6 +451,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
             imageBitmap: false,
             image: null,
             imageID: null,
+            loadedImageID: null,
             imageOffset: 0,
             imageSize: {
                 height: 0,
@@ -456,6 +469,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
             renderData: {
                 visibleSkeletonElements: {},
             },
+            relatedImage: null,
             issueRegions: {},
             scale: 1,
             top: 0,
@@ -568,6 +582,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
     public setup(frameData: any, objectStates: any[], renderData: RenderData = {
         visibleSkeletonElements: {},
     }): void {
+        const frameChanged = this.data.imageID !== frameData.number;
         if (this.data.imageID !== frameData.number) {
             if ([Mode.EDIT, Mode.DRAG, Mode.RESIZE].includes(this.data.mode)) {
                 throw Error(`Canvas is busy. Action: ${this.data.mode}`);
@@ -590,6 +605,12 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
             return;
         }
 
+        if (frameChanged) {
+            this.data.loadedImageID = null;
+            this.data.relatedImage = null;
+            this.notify(UpdateReasons.RELATED_IMAGE_CHANGED);
+        }
+
         this.data.imageID = frameData.number;
         this.data.imageIsDeleted = frameData.deleted;
         if (this.data.imageIsDeleted) {
@@ -600,6 +621,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
         frameData
             .data((): void => {
                 this.data.image = null;
+                this.data.loadedImageID = null;
                 this.notify(UpdateReasons.IMAGE_CHANGED);
             })
             .then((data: Image): void => {
@@ -620,6 +642,7 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
                 };
 
                 this.data.image = data;
+                this.data.loadedImageID = frameData.number;
                 this.resetScale();
 
                 // restore correct image position after switching to a new frame
@@ -657,6 +680,15 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
                     this.notify(UpdateReasons.DATA_FAILED);
                 }
             });
+    }
+
+    public setRelatedImage(data: RelatedImageData | null): void {
+        if (data !== null && data.frameNumber !== this.data.imageID) {
+            return;
+        }
+
+        this.data.relatedImage = data;
+        this.notify(UpdateReasons.RELATED_IMAGE_CHANGED);
     }
 
     public setupIssueRegions(issueRegions: Record<number, { hidden: boolean; points: number[] }>): void {
@@ -1103,6 +1135,14 @@ export class CanvasModelImpl extends MasterImpl implements CanvasModel {
 
     public get image(): Image | null {
         return this.data.image;
+    }
+
+    public get relatedImage(): RelatedImageData | null {
+        if (this.data.relatedImage?.frameNumber !== this.data.loadedImageID) {
+            return null;
+        }
+
+        return this.data.relatedImage;
     }
 
     public get issueRegions(): Record<number, { hidden: boolean; points: number[] }> {

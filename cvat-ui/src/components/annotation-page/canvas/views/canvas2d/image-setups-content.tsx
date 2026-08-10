@@ -22,15 +22,24 @@ import {
     changeSaturationLevel,
     changeGridSize,
     resetImageFilters,
+    changeRelatedImageOverlay,
 } from 'actions/settings-actions';
 import { clamp } from 'utils/math';
-import { GridColor, CombinedState, PlayerSettingsState } from 'reducers';
+import {
+    GridColor, CombinedState, PlayerSettingsState, RelatedImageBlendMode,
+} from 'reducers';
 import GammaFilter from './gamma-filter';
 
 const minGridSize = 5;
 const maxGridSize = 1000;
 
-export default function ImageSetupsContent(): JSX.Element {
+interface Props {
+    relatedImageNames: string[];
+    relatedImagesFetching: boolean;
+}
+
+export default function ImageSetupsContent(props: Props): JSX.Element {
+    const { relatedImageNames, relatedImagesFetching } = props;
     const dispatch = useDispatch();
     const {
         brightnessLevel,
@@ -40,10 +49,78 @@ export default function ImageSetupsContent(): JSX.Element {
         gridColor,
         gridSize,
         grid: gridEnabled,
+        relatedImageOverlay,
     } = useSelector((state: CombinedState): PlayerSettingsState => state.settings.player);
+    const relatedFiles = useSelector((state: CombinedState): number => (
+        state.annotation.player.frame.relatedFiles
+    ));
 
     return (
         <div className='cvat-canvas-image-setups-content'>
+            <Text>Related image overlay</Text>
+            <hr />
+            <Row className='cvat-image-setups-related-image-overlay' align='middle' gutter={8}>
+                <Col span={8}>
+                    <Checkbox
+                        className='cvat-related-image-overlay-enabled'
+                        checked={relatedImageOverlay.enabled}
+                        disabled={!relatedFiles}
+                        onChange={(event: CheckboxChangeEvent): void => {
+                            dispatch(changeRelatedImageOverlay({ enabled: event.target.checked }));
+                        }}
+                    >
+                        Enabled
+                    </Checkbox>
+                </Col>
+                <Col span={8}>
+                    <Text className='cvat-text-color'>Opacity</Text>
+                    <Slider
+                        className='cvat-related-image-overlay-opacity'
+                        min={0}
+                        max={100}
+                        value={relatedImageOverlay.opacity}
+                        disabled={!relatedImageOverlay.enabled || !relatedFiles}
+                        onChange={(value: number | [number, number]): void => {
+                            dispatch(changeRelatedImageOverlay({ opacity: value as number }));
+                        }}
+                    />
+                </Col>
+                <Col span={8}>
+                    <Text className='cvat-text-color'>Image</Text>
+                    <Select
+                        className='cvat-related-image-overlay-select'
+                        value={relatedImageNames[relatedImageOverlay.selectedIndex] ?
+                            relatedImageOverlay.selectedIndex : undefined}
+                        placeholder={relatedImagesFetching ? 'Loading...' : 'No data'}
+                        loading={relatedImagesFetching}
+                        disabled={!relatedImageOverlay.enabled || relatedImageNames.length < 2}
+                        onChange={(selectedIndex: number): void => {
+                            dispatch(changeRelatedImageOverlay({ selectedIndex }));
+                        }}
+                    >
+                        {relatedImageNames.map((name, index) => (
+                            <Select.Option key={name} value={index}>{name}</Select.Option>
+                        ))}
+                    </Select>
+                </Col>
+            </Row>
+            <Row className='cvat-image-setups-related-image-blend-mode' align='middle' gutter={8}>
+                <Col span={8} offset={16}>
+                    <Text className='cvat-text-color'>Blend mode</Text>
+                    <Select
+                        className='cvat-related-image-overlay-blend-mode'
+                        value={relatedImageOverlay.blendMode}
+                        disabled={!relatedImageOverlay.enabled || !relatedFiles}
+                        onChange={(blendMode: RelatedImageBlendMode): void => {
+                            dispatch(changeRelatedImageOverlay({ blendMode }));
+                        }}
+                        options={Object.values(RelatedImageBlendMode).map((blendMode) => ({
+                            label: blendMode,
+                            value: blendMode,
+                        }))}
+                    />
+                </Col>
+            </Row>
             <Text>Image grid</Text>
             <hr />
             <Row justify='space-between' align='middle' gutter={8}>

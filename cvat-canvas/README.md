@@ -32,6 +32,7 @@ For API methods, their arguments and return types, please look at ``canvas.ts``.
 - Drawn texts have the class `cvat_canvas_text`
 - Tags have the class `cvat_canvas_tag`
 - Canvas image has ID `cvat_canvas_image`
+- Related image overlay has ID `cvat_canvas_related_image`
 - Grid on the canvas has ID `cvat_canvas_grid` and `cvat_canvas_grid_pattern`
 - Crosshair during a draw has class `cvat_canvas_crosshair`
 - To stick something to a specific position you can use an element with id `cvat_canvas_attachment_board`
@@ -103,6 +104,7 @@ canvas.draw({
 |                | IDLE | GROUP | SPLIT | DRAW | MERGE | EDIT | DRAG | RESIZE | ZOOM_CANVAS | DRAG_CANVAS | INTERACT | JOIN | SLICE | SELECT_REGION |
 | -------------- | ---- | ----- | ----- | ---- | ----- | ---- | ---- | ------ | ----------- | ----------- | -------- | ---- | ----- | ------------- |
 | setup()        | +    | +     | +     | +/-  | +     | +/-  | +/-  | +/-    | +           | +           | +        | +    | +     | +             |
+| relatedImage() | +    | +     | +     | +    | +     | +    | +     | +      | +           | +           | +        | +    | +     | +             |
 | activate()     | +    | -     | -     | -    | -     | -    | -    | -      | -           | -           | -        | -    | -     | -             |
 | rotate()       | +    | +     | +     | +    | +     | +    | +    | +      | +           | +           | +        | +    | +     | +             |
 | focus()        | +    | +     | +     | +    | +     | +    | +    | +      | +           | +           | +        | +    | +     | +             |

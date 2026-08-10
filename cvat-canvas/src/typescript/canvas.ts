@@ -12,6 +12,7 @@ import {
     CuboidDrawingMethod, Configuration, Geometry, Mode,
     HighlightSeverity as _HighlightSeverity, CanvasHint as _CanvasHint,
     PolyEditData, RenderData as _RenderData,
+    RelatedImageData as _RelatedImageData,
 } from './canvasModel';
 import { Master } from './master';
 import { CanvasController, CanvasControllerImpl } from './canvasController';
@@ -22,6 +23,7 @@ import '../scss/canvas.scss';
 interface Canvas {
     html(): HTMLDivElement;
     setup(frameData: any, objectStates: any[], renderData?: RenderData): void;
+    relatedImage(data: RelatedImageData | null): void;
     setupIssueRegions(issueRegions: Record<number, { hidden: boolean; points: number[] }>): void;
     translateFromSVG(points: number[]): number[];
     setupConflictRegions(clientID: number): number[];
@@ -76,6 +78,10 @@ class CanvasImpl implements Canvas {
 
     public setup(frameData: any, objectStates: any[], renderData?: RenderData): void {
         this.model.setup(frameData, objectStates, renderData);
+    }
+
+    public relatedImage(data: RelatedImageData | null): void {
+        this.model.setRelatedImage(data);
     }
 
     public setupIssueRegions(issueRegions: Record<number, { hidden: boolean; points: number[] }>): void {
@@ -208,6 +214,7 @@ export type CanvasHint = _CanvasHint;
 export type InteractionResult = _InteractionResult;
 export type HighlightSeverity = _HighlightSeverity;
 export type RenderData = _RenderData;
+export type RelatedImageData = _RelatedImageData;
 
 export {
     CanvasImpl as Canvas, RectDrawingMethod, CuboidDrawingMethod, Mode as CanvasMode,

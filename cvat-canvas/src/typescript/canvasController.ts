@@ -22,11 +22,13 @@ import {
     HighlightedElements,
     PolyEditData,
     RenderData,
+    RelatedImageData,
 } from './canvasModel';
 
 export interface CanvasController {
     readonly objects: any[];
     readonly renderData: RenderData;
+    readonly relatedImage: RelatedImageData | null;
     readonly issueRegions: Record<number, { hidden: boolean; points: number[] }>;
     readonly focusData: FocusData;
     readonly activeElement: ActiveElement;
@@ -125,6 +127,10 @@ export class CanvasControllerImpl implements CanvasController {
 
     public get renderData(): RenderData {
         return this.model.renderData;
+    }
+
+    public get relatedImage(): RelatedImageData | null {
+        return this.model.relatedImage;
     }
 
     public get focusData(): FocusData {

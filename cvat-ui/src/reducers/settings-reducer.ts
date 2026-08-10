@@ -9,7 +9,7 @@ import { AuthActionTypes } from 'actions/auth-actions';
 import { SettingsActionTypes } from 'actions/settings-actions';
 import { AnnotationActionTypes } from 'actions/annotation-actions';
 import {
-    SettingsState, GridColor, FrameSpeed, ColorBy,
+    SettingsState, GridColor, FrameSpeed, ColorBy, RelatedImageBlendMode,
 } from 'reducers';
 
 const defaultState: SettingsState = {
@@ -64,6 +64,12 @@ const defaultState: SettingsState = {
         brightnessLevel: 100,
         contrastLevel: 100,
         saturationLevel: 100,
+        relatedImageOverlay: {
+            enabled: false,
+            opacity: 50,
+            selectedIndex: 0,
+            blendMode: RelatedImageBlendMode.NORMAL,
+        },
     },
     imageFilters: [],
     showDialog: false,
@@ -113,6 +119,18 @@ export default (state = defaultState, action: AnyAction): SettingsState => {
                 player: {
                     ...state.player,
                     gridOpacity: action.payload.gridOpacity,
+                },
+            };
+        }
+        case SettingsActionTypes.CHANGE_RELATED_IMAGE_OVERLAY: {
+            return {
+                ...state,
+                player: {
+                    ...state.player,
+                    relatedImageOverlay: {
+                        ...state.player.relatedImageOverlay,
+                        ...action.payload.settings,
+                    },
                 },
             };
         }

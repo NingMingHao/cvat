@@ -8,7 +8,7 @@ import { AnyAction } from 'redux';
 import { ThunkAction } from 'utils/redux';
 import {
     GridColor, ColorBy, SettingsState, ToolsBlockerState,
-    CombinedState,
+    CombinedState, RelatedImageOverlaySettings,
 } from 'reducers';
 import { OrientationVisibility } from 'cvat-canvas3d-wrapper';
 import { SerializedImageFilter } from 'cvat-core-wrapper';
@@ -23,6 +23,7 @@ export enum SettingsActionTypes {
     CHANGE_GRID_SIZE = 'CHANGE_GRID_SIZE',
     CHANGE_GRID_COLOR = 'CHANGE_GRID_COLOR',
     CHANGE_GRID_OPACITY = 'CHANGE_GRID_OPACITY',
+    CHANGE_RELATED_IMAGE_OVERLAY = 'CHANGE_RELATED_IMAGE_OVERLAY',
     CHANGE_SHAPES_OPACITY = 'CHANGE_SHAPES_OPACITY',
     CHANGE_SELECTED_SHAPES_OPACITY = 'CHANGE_SELECTED_SHAPES_OPACITY',
     CHANGE_SHAPES_COLOR_BY = 'CHANGE_SHAPES_COLOR_BY',
@@ -177,6 +178,15 @@ export function changeGridOpacity(gridOpacity: number): AnyAction {
         type: SettingsActionTypes.CHANGE_GRID_OPACITY,
         payload: {
             gridOpacity,
+        },
+    };
+}
+
+export function changeRelatedImageOverlay(settings: Partial<RelatedImageOverlaySettings>): AnyAction {
+    return {
+        type: SettingsActionTypes.CHANGE_RELATED_IMAGE_OVERLAY,
+        payload: {
+            settings,
         },
     };
 }

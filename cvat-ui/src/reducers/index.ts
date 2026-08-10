@@ -1008,6 +1008,20 @@ export enum FrameSpeed {
     Slowest = 1,
 }
 
+export enum RelatedImageBlendMode {
+    NORMAL = 'normal',
+    MULTIPLY = 'multiply',
+    SCREEN = 'screen',
+    DIFFERENCE = 'difference',
+}
+
+export interface RelatedImageOverlaySettings {
+    enabled: boolean;
+    opacity: number;
+    selectedIndex: number;
+    blendMode: RelatedImageBlendMode;
+}
+
 export enum ColorBy {
     INSTANCE = 'Instance',
     GROUP = 'Group',
@@ -1029,6 +1043,7 @@ export interface PlayerSettingsState {
     brightnessLevel: number;
     contrastLevel: number;
     saturationLevel: number;
+    relatedImageOverlay: RelatedImageOverlaySettings;
 }
 
 export interface WorkspaceSettingsState {

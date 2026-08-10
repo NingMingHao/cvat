@@ -15,7 +15,7 @@ import debounce from 'lodash/debounce';
 
 import GlobalHotKeys, { KeyMap } from 'utils/mousetrap-react';
 import {
-    ColorBy, GridColor, Workspace, ActiveControl, CombinedState,
+    ColorBy, GridColor, Workspace, ActiveControl, CombinedState, RelatedImageOverlaySettings,
 } from 'reducers';
 import { EventScope } from 'cvat-logger';
 import {
@@ -60,6 +60,7 @@ import {
     changeSaturationLevel,
     switchAutomaticBordering,
     switchSnapToPoint,
+    changeRelatedImageOverlay,
 } from 'actions/settings-actions';
 import { reviewActions } from 'actions/review-actions';
 
@@ -86,6 +87,8 @@ interface StateToProps {
     frameAngle: number;
     canvasIsReady: boolean;
     frame: number;
+    relatedFiles: number;
+    relatedImageOverlay: RelatedImageOverlaySettings;
     opacity: number;
     colorBy: ColorBy;
     selectedOpacity: number;
@@ -151,6 +154,7 @@ interface DispatchToProps {
     onSwitchGrid(enabled: boolean): void;
     onSwitchAutomaticBordering(enabled: boolean): void;
     onSwitchSnapToPoint(enabled: boolean): void;
+    onChangeRelatedImageOverlay(settings: Partial<RelatedImageOverlaySettings>): void;
     onFetchAnnotation(): void;
     onGetDataFailed(error: Error): void;
     onCanvasErrorOccurred(error: Error): void;
@@ -167,7 +171,7 @@ function mapStateToProps(state: CombinedState): StateToProps {
             drawing: { activeLabelID, activeObjectType },
             job: { instance: jobInstance },
             player: {
-                frame: { data: frameData, number: frame },
+                frame: { data: frameData, number: frame, relatedFiles },
                 frameAngles,
             },
             annotations: {
@@ -193,6 +197,7 @@ function mapStateToProps(state: CombinedState): StateToProps {
                 saturationLevel,
                 resetZoom,
                 smoothImage,
+                relatedImageOverlay,
             },
             workspace: {
                 focusedObjectPadding,
@@ -224,6 +229,8 @@ function mapStateToProps(state: CombinedState): StateToProps {
         frameAngle: frameAngles[frame - jobInstance.startFrame],
         canvasIsReady,
         frame,
+        relatedFiles,
+        relatedImageOverlay,
         activatedStateID,
         activatedElementID,
         activatedAttributeID,
@@ -382,6 +389,9 @@ function mapDispatchToProps(dispatch: any): DispatchToProps {
         onSwitchSnapToPoint(enabled: boolean): void {
             dispatch(switchSnapToPoint(enabled));
         },
+        onChangeRelatedImageOverlay(settings: Partial<RelatedImageOverlaySettings>): void {
+            dispatch(changeRelatedImageOverlay(settings));
+        },
         onFetchAnnotation(): void {
             dispatch(fetchAnnotationsAsync());
         },
@@ -402,9 +412,20 @@ function mapDispatchToProps(dispatch: any): DispatchToProps {
 
 type Props = StateToProps & DispatchToProps;
 
-class CanvasWrapperComponent extends React.PureComponent<Props> {
+interface State {
+    relatedImages: Record<string, ImageBitmap>;
+    relatedImagesFetching: boolean;
+}
+
+class CanvasWrapperComponent extends React.PureComponent<Props, State> {
     private debouncedUpdate = debounce(this.updateCanvas.bind(this), 250, { leading: true });
     private canvasTipsRef = React.createRef<CanvasTipsComponent>();
+    private relatedImagesRequestID = 0;
+
+    public state: State = {
+        relatedImages: {},
+        relatedImagesFetching: false,
+    };
 
     public componentDidMount(): void {
         const {
@@ -459,9 +480,10 @@ class CanvasWrapperComponent extends React.PureComponent<Props> {
 
         this.initialSetup();
         this.updateCanvas();
+        this.loadRelatedImages();
     }
 
-    public componentDidUpdate(prevProps: Props): void {
+    public componentDidUpdate(prevProps: Props, prevState: State): void {
         const {
             opacity,
             selectedOpacity,
@@ -500,6 +522,9 @@ class CanvasWrapperComponent extends React.PureComponent<Props> {
             imageFilters,
             focusedObjectPadding,
             renderData,
+            relatedFiles,
+            relatedImageOverlay,
+            jobInstance,
         } = this.props;
         const { canvasInstance } = this.props as { canvasInstance: Canvas };
 
@@ -617,6 +642,22 @@ class CanvasWrapperComponent extends React.PureComponent<Props> {
             this.debouncedUpdate();
         }
 
+        if (
+            prevProps.frame !== this.props.frame ||
+            prevProps.jobInstance?.id !== jobInstance?.id ||
+            prevProps.relatedFiles !== relatedFiles ||
+            prevProps.relatedImageOverlay.enabled !== relatedImageOverlay.enabled
+        ) {
+            this.loadRelatedImages();
+        } else if (
+            prevState.relatedImages !== this.state.relatedImages ||
+            prevProps.relatedImageOverlay.opacity !== relatedImageOverlay.opacity ||
+            prevProps.relatedImageOverlay.selectedIndex !== relatedImageOverlay.selectedIndex ||
+            prevProps.relatedImageOverlay.blendMode !== relatedImageOverlay.blendMode
+        ) {
+            this.syncRelatedImageOverlay();
+        }
+
         if (prevProps.showBitmap !== showBitmap) {
             canvasInstance.bitmap(showBitmap);
         }
@@ -634,6 +675,9 @@ class CanvasWrapperComponent extends React.PureComponent<Props> {
 
     public componentWillUnmount(): void {
         const { canvasInstance } = this.props as { canvasInstance: Canvas };
+
+        this.relatedImagesRequestID++;
+        canvasInstance.relatedImage(null);
 
         canvasInstance.html().removeEventListener('mousedown', this.onCanvasMouseDown);
         canvasInstance.html().removeEventListener('click', this.onCanvasClicked);
@@ -666,6 +710,83 @@ class CanvasWrapperComponent extends React.PureComponent<Props> {
         canvasInstance.html().removeEventListener('canvas.error', this.onCanvasErrorOccurrence);
         canvasInstance.html().removeEventListener('canvas.warning', this.onCanvasWarningOccurrence);
         canvasInstance.html().removeEventListener('canvas.message', this.onCanvasMessage as EventListener);
+    }
+
+    private loadRelatedImages(): void {
+        const {
+            canvasInstance, jobInstance, frame, relatedFiles, relatedImageOverlay,
+        } = this.props as Props & { canvasInstance: Canvas };
+        const requestID = ++this.relatedImagesRequestID;
+
+        canvasInstance.relatedImage(null);
+        if (!relatedImageOverlay.enabled || !relatedFiles) {
+            if (this.state.relatedImagesFetching || Object.keys(this.state.relatedImages).length) {
+                this.setState({ relatedImages: {}, relatedImagesFetching: false });
+            }
+            return;
+        }
+
+        this.setState({ relatedImages: {}, relatedImagesFetching: true });
+        jobInstance.frames.contextImage(frame).then((relatedImages: Record<string, ImageBitmap>) => {
+            if (
+                requestID !== this.relatedImagesRequestID ||
+                this.props.jobInstance?.id !== jobInstance.id ||
+                this.props.frame !== frame ||
+                !this.props.relatedImageOverlay.enabled
+            ) {
+                return;
+            }
+
+            const relatedImageNames = Object.keys(relatedImages).sort();
+            const selectedIndex = Math.max(0, Math.min(
+                this.props.relatedImageOverlay.selectedIndex,
+                Math.max(relatedImageNames.length - 1, 0),
+            ));
+            if (selectedIndex !== this.props.relatedImageOverlay.selectedIndex) {
+                this.props.onChangeRelatedImageOverlay({ selectedIndex });
+            }
+            this.setState({ relatedImages, relatedImagesFetching: false });
+        }).catch((error: unknown) => {
+            if (
+                requestID !== this.relatedImagesRequestID ||
+                this.props.jobInstance?.id !== jobInstance.id ||
+                this.props.frame !== frame
+            ) {
+                return;
+            }
+
+            this.setState({ relatedImages: {}, relatedImagesFetching: false });
+            if (typeof error !== 'number') {
+                notification.error({
+                    message: `Could not fetch related images. Frame: ${frame}`,
+                    description: error instanceof Error ? error.message : String(error),
+                });
+            }
+        });
+    }
+
+    private syncRelatedImageOverlay(): void {
+        const {
+            canvasInstance, frame, relatedImageOverlay,
+        } = this.props as Props & { canvasInstance: Canvas };
+        const relatedImageNames = Object.keys(this.state.relatedImages).sort();
+        const selectedIndex = Math.max(0, Math.min(
+            relatedImageOverlay.selectedIndex,
+            Math.max(relatedImageNames.length - 1, 0),
+        ));
+        const imageData = this.state.relatedImages[relatedImageNames[selectedIndex]];
+
+        if (!relatedImageOverlay.enabled || !imageData) {
+            canvasInstance.relatedImage(null);
+            return;
+        }
+
+        canvasInstance.relatedImage({
+            frameNumber: frame,
+            imageData,
+            opacity: relatedImageOverlay.opacity / 100,
+            blendMode: relatedImageOverlay.blendMode,
+        });
     }
 
     private onCanvasErrorOccurrence = (event: any): void => {
@@ -1246,7 +1367,12 @@ class CanvasWrapperComponent extends React.PureComponent<Props> {
                     trigger='click'
                     placement='top'
                     overlayInnerStyle={{ padding: 0 }}
-                    content={<ImageSetupsContent />}
+                    content={(
+                        <ImageSetupsContent
+                            relatedImageNames={Object.keys(this.state.relatedImages).sort()}
+                            relatedImagesFetching={this.state.relatedImagesFetching}
+                        />
+                    )}
                 >
                     <UpOutlined className='cvat-canvas-image-setups-trigger' />
                 </Popover>
