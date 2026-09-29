@@ -72,18 +72,19 @@ For a fully managed setup, annotation services, or enterprise features, see
 > 💡 CVAT is primarily tested with Chromium-based browsers (Google Chrome, Microsoft Edge).
 > Firefox may work with some caveats; Safari/WebKit is not supported.
 
-**1. Start the default stack**
+**1. Build and start the local stack**
 
-Clone the repository and launch the services.
+Clone the repository, build the server and UI from the local source, and launch the services.
 
 ```bash
-git clone https://github.com/cvat-ai/cvat
+git clone https://github.com/NingMingHao/cvat.git
 cd cvat
 
-# Optional: set your IP or domain
-# export CVAT_HOST=your-ip-or-domain
+# Optional: use the host name or LAN address from which CVAT will be opened.
+# Omit this line when using http://localhost:8080.
+export CVAT_HOST=192.168.2.100
 
-docker compose up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
 **2. Create an admin account**
@@ -100,6 +101,98 @@ instructions and OS-specific setup.
 - Open [http://localhost:8080](http://localhost:8080) (or your `CVAT_HOST`) in your browser.
 - Log in with your superuser account.
 - Create a project or task, upload your data (images, videos, or point clouds), and define labels to start annotating.
+
+### BEV overlay and context images
+
+This fork adds controls for working with related scene images such as `bev.jpg` and `center.jpg`:
+
+- Open **Image settings** above the main annotation canvas and enable **Related image overlay**.
+- Select `bev.jpg` to draw it over the main canvas; other context images remain unchanged.
+- Press **X** to quickly show or hide the selected overlay.
+- **Shift+X** moves to the previous chapter.
+- Scroll the mouse wheel over a context image to zoom.
+- Hold the middle mouse button and drag to pan a context image.
+- Use the circular-arrow button in the upper-left of a context image to reset its zoom and pan.
+- Context-image zoom and pan are preserved when moving between frames.
+
+If **X** has an old assignment from a previous build, reload CVAT once after updating. You can also open
+**Settings → Shortcuts** and choose **Restore defaults**. The overlay shortcut is listed as
+**Toggle related image overlay** and can be customized there.
+
+After changing UI source code, rebuild and recreate the UI container:
+
+```bash
+CVAT_HOST=192.168.2.100 docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.dev.yml \
+  up -d --build cvat_ui
+
+docker restart traefik
+```
+
+Replace `192.168.2.100` with the address used to open CVAT.
+
+### Store CVAT data on other disks
+
+By default, Docker stores CVAT's named volumes in Docker's data directory. To place them on a mounted disk,
+create the destination directories first and add a `docker-compose.storage.yml` override:
+
+```yaml
+volumes:
+  cvat_data:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/data
+      o: bind
+  cvat_db:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/db
+      o: bind
+  cvat_cache_db:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/cache
+      o: bind
+  cvat_keys:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/keys
+      o: bind
+  cvat_logs:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/logs
+      o: bind
+  cvat_events_db:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/events
+      o: bind
+  cvat_inmem_db:
+    driver_opts:
+      type: none
+      device: /mnt/cvat-disk/cvat/inmem
+      o: bind
+```
+
+Include the override whenever the stack is managed:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.dev.yml \
+  -f docker-compose.storage.yml \
+  up -d --build
+```
+
+For multiple disks, assign different `device` paths to different volumes. For example, keep `cvat_data` on a
+large data disk and `cvat_db`/`cvat_cache_db` on a faster SSD. Docker Compose does not split one named volume
+across disks; use RAID, LVM, ZFS, or shared storage underneath the mount point when one CVAT volume must span
+multiple devices.
+
+Configure these paths before the first start. Existing named volumes are not automatically moved when the
+override is added; back them up and migrate their contents before switching an existing installation.
 
 Learn more about annotation tools and workflows in the [CVAT Documentation](https://docs.cvat.ai/docs/) or
 take our free course – [CVAT Academy](https://www.cvat.ai/resources/academy).

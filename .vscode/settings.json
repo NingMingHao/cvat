@@ -38,5 +38,6 @@
     "python.testing.cwd": "${workspaceFolder}/tests",
     "cSpell.words": [
         "crowdsourcing"
-    ]
+    ],
+    "ROS2.distro": "noetic"
 }

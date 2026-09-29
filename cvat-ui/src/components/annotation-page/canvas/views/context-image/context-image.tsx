@@ -10,7 +10,7 @@ import PropTypes from 'prop-types';
 import notification from 'antd/lib/notification';
 import Spin from 'antd/lib/spin';
 import Text from 'antd/lib/typography/Text';
-import { SettingOutlined } from '@ant-design/icons';
+import { SettingOutlined, UndoOutlined } from '@ant-design/icons';
 
 import CVATTooltop from 'components/common/cvat-tooltip';
 import { CombinedState } from 'reducers';
@@ -19,6 +19,10 @@ import ContextImageSelector from './context-image-selector';
 interface Props {
     offset: number[];
 }
+
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 5;
+const ZOOM_FACTOR = 1.1;
 
 function ContextImage(props: Props): JSX.Element {
     const { offset } = props;
@@ -45,6 +49,39 @@ function ContextImage(props: Props): JSX.Element {
 
     const [hasError, setHasError] = useState<boolean>(false);
     const [showSelector, setShowSelector] = useState<boolean>(false);
+    const [zoom, setZoom] = useState<number>(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [panning, setPanning] = useState<boolean>(false);
+
+    const resetView = (): void => {
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+    };
+
+    const onWheel = (event: React.WheelEvent<HTMLCanvasElement>): void => {
+        event.preventDefault();
+        setZoom((currentZoom: number): number => (
+            Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, currentZoom * (
+                event.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR
+            )))
+        ));
+    };
+
+    const onMouseDown = (event: React.MouseEvent<HTMLCanvasElement>): void => {
+        if (event.button === 1) {
+            event.preventDefault();
+            setPanning(true);
+        }
+    };
+
+    const onMouseMove = (event: React.MouseEvent<HTMLCanvasElement>): void => {
+        if (panning && event.buttons === 4) {
+            setPan((currentPan) => ({
+                x: currentPan.x + event.movementX,
+                y: currentPan.y + event.movementY,
+            }));
+        }
+    };
 
     useEffect(() => {
         let unmounted = false;
@@ -106,12 +143,31 @@ function ContextImage(props: Props): JSX.Element {
                     </CVATTooltop>
                 </div>
             </div>
+            <CVATTooltop title='Reset zoom and pan'>
+                <button
+                    type='button'
+                    aria-label='Reset context image zoom and pan'
+                    className='cvat-context-image-reset-view-button'
+                    onClick={resetView}
+                >
+                    <UndoOutlined />
+                </button>
+            </CVATTooltop>
             { (hasError ||
                 (!fetching && contextImageOffset >= Object.keys(contextImageData).length)) && <Text> No data </Text>}
             { fetching && <Spin size='small' /> }
             {
                 contextImageOffset < Object.keys(contextImageData).length &&
-                <canvas ref={canvasRef} />
+                <canvas
+                    ref={canvasRef}
+                    className={panning ? 'cvat-context-image-panning' : ''}
+                    style={{ transform: `translate(${pan.x}px, calc(-50% + ${pan.y}px)) scale(${zoom})` }}
+                    onWheel={onWheel}
+                    onMouseDown={onMouseDown}
+                    onMouseMove={onMouseMove}
+                    onMouseUp={() => setPanning(false)}
+                    onMouseLeave={() => setPanning(false)}
+                />
             }
             { showSelector && (
                 <ContextImageSelector

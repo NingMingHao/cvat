@@ -499,10 +499,21 @@ export function restoreSettingsAsync(): ThunkAction {
 
         if ('shortcuts' in loadedSettings) {
             const updateKeyMap = structuredClone(shortcuts.keyMap);
+            const obsoleteDefaultSequences: Record<string, string[]> = {
+                CHAPTER_BACKWARD: ['x'],
+                TOGGLE_RELATED_IMAGE_OVERLAY: ['alt+b'],
+            };
 
             Object.entries(loadedSettings.shortcuts.keyMap).forEach(([key, value]) => {
                 if (key in updateKeyMap) {
-                    updateKeyMap[key].sequences = (value as { sequences: string[] }).sequences;
+                    const { sequences } = value as { sequences: string[] };
+                    const obsoleteDefault = obsoleteDefaultSequences[key];
+                    const usesObsoleteDefault = obsoleteDefault &&
+                        _.isEqual(sequences, obsoleteDefault);
+
+                    if (!usesObsoleteDefault) {
+                        updateKeyMap[key].sequences = sequences;
+                    }
                 }
             });
 

@@ -41,6 +41,16 @@ context('Context images for 2D tasks.', () => {
             cy.get('.cvat-related-image-overlay-enabled input').should('not.be.checked');
         });
 
+        it('Toggle the related image overlay with X.', () => {
+            cy.get('body').type('x');
+            cy.get('.cvat-related-image-overlay-enabled input').should('be.checked');
+            cy.get('#cvat_canvas_related_image').should('be.visible');
+
+            cy.get('body').type('x');
+            cy.get('.cvat-related-image-overlay-enabled input').should('not.be.checked');
+            cy.get('#cvat_canvas_related_image').should('not.be.visible');
+        });
+
         it('Enable the related image overlay without intercepting canvas interaction.', () => {
             cy.get('.cvat-related-image-overlay-enabled').click();
             cy.get('#cvat_canvas_related_image')
@@ -97,6 +107,30 @@ context('Context images for 2D tasks.', () => {
                 });
             });
             cy.get('.cvat-context-image-wrapper').should('exist').and('be.visible');
+        });
+
+        it('Keep context image zoom between frames and reset it on demand.', () => {
+            cy.get('.cvat-context-image-wrapper').first().within(() => {
+                cy.get('canvas')
+                    .trigger('wheel', { deltaY: -1 })
+                    .trigger('mousedown', { button: 1, buttons: 4 })
+                    .trigger('mousemove', { movementX: 20, movementY: 10, buttons: 4 })
+                    .trigger('mouseup', { button: 1, buttons: 0 })
+                    .should('have.attr', 'style')
+                    .and('contain', 'scale(1.1)')
+                    .and('contain', 'translate(20px, calc(-50% + 10px))');
+            });
+
+            cy.get('.cvat-player-previous-button').click();
+            cy.get('.cvat-context-image-wrapper').first().within(() => {
+                cy.get('canvas').should('have.attr', 'style')
+                    .and('contain', 'scale(1.1)')
+                    .and('contain', 'translate(20px, calc(-50% + 10px))');
+                cy.get('.cvat-context-image-reset-view-button').click();
+                cy.get('canvas').should('have.attr', 'style')
+                    .and('contain', 'scale(1)')
+                    .and('contain', 'translate(0px, calc(-50% + 0px))');
+            });
         });
 
         it('Disable and clear the related image overlay.', () => {

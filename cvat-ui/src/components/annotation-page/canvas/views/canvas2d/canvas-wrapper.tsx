@@ -309,6 +309,12 @@ const componentShortcuts = {
         sequences: ['shift+tab'],
         scope: ShortcutScope.ANNOTATION_PAGE,
     },
+    TOGGLE_RELATED_IMAGE_OVERLAY: {
+        name: 'Toggle related image overlay',
+        description: 'Show or hide the selected related image over the main canvas',
+        sequences: ['x'],
+        scope: ShortcutScope.ANNOTATION_PAGE,
+    },
 };
 
 registerComponentShortcuts(componentShortcuts);
@@ -1285,6 +1291,9 @@ class CanvasWrapperComponent extends React.PureComponent<Props, State> {
             onOpenLayerStack,
             onActivateObject,
             onExpandObject,
+            relatedFiles,
+            relatedImageOverlay,
+            onChangeRelatedImageOverlay,
         } = this.props;
         const { canvasInstance } = this.props as { canvasInstance: Canvas };
 
@@ -1333,6 +1342,12 @@ class CanvasWrapperComponent extends React.PureComponent<Props, State> {
             PREVIOUS_OBJECT: (event: KeyboardEvent | undefined) => {
                 preventDefault(event);
                 navigateObject(-1);
+            },
+            TOGGLE_RELATED_IMAGE_OVERLAY: (event: KeyboardEvent | undefined) => {
+                if (relatedFiles) {
+                    preventDefault(event);
+                    onChangeRelatedImageOverlay({ enabled: !relatedImageOverlay.enabled });
+                }
             },
         };
 
